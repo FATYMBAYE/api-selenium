@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <title>Calculatrice Simple</title>
+</head>
+<body>
+    <h1>Calculatrice Simple (FastAPI)</h1>
+
+    <label for="a">Nombre 1 :</label>
+    <input type="number" id="a" name="a" />
+
+    <label for="b">Nombre 2 :</label>
+    <input type="number" id="b" name="b" />
+
+    <br /><br />
+
+    <button onclick="calculate('add')">Addition</button>
+    <button onclick="calculate('subtract')">Soustraction</button>
+    <button onclick="calculate('multiply')">Multiplication</button>
+    <button onclick="calculate('divide')">Division</button>
+
+    <h2>Résultat : <span id="result">--</span></h2>
+
+    <script>
+        async function calculate(operation) {
+            const a = document.getElementById('a').value;
+            const b = document.getElementById('b').value;
+
+            if (a === '' || b === '') {
+                alert('Veuillez entrer les deux nombres.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`http://localhost:8000/${operation}?a=${a}&b=${b}`);
+                if (!response.ok) {
+                    throw new Error('Erreur API');
+                }
+                const data = await response.json();
+                document.getElementById('result').textContent = data.result;
+            } catch (error) {
+                document.getElementById('result').textContent = 'Erreur : ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
