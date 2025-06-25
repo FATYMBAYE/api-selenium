@@ -4,6 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = 'tp3-api'
         CONTAINER_NAME = 'tp3-api-container'
+        API_URL = 'http://host.docker.internal:8000/00/'  // adapte ce path à ta route valide
     }
 
     stages {
@@ -24,22 +25,20 @@ pipeline {
             steps {
                 echo 'Lancement du container API...'
                 sh 'docker rm -f ${CONTAINER_NAME} || true'
-                sh 'docker run -d --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest'
+                sh 'docker run -d --name ${CONTAINER_NAME} -p 8000:8000 ${IMAGE_NAME}:latest'
 
-                echo 'Vérification que l’API est prête depuis le container...'
-                sh '''
-                for i in {1..10}; do
-                  code=$(docker exec ${CONTAINER_NAME} curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/)
-                  if [ "$code" = "200" ]; then
-                    echo "API prête avec HTTP 200."
-                    exit 0
-                  fi
-                  echo "Tentative $i : HTTP $code. Nouvelle tentative dans 2s..."
-                  sleep 2
-                done
-                echo "Erreur : l’API n’a pas répondu correctement après 10 tentatives."
-                exit 1
-                '''
+                echo 'Vérification que l’API est prête depuis le container Jenkins...'
+                script {
+                    retry(10) {
+                        def code = sh(script: "curl -L -s -o /dev/null -w \"%{http_code}\" ${API_URL}", returnStdout: true).trim()
+                        if (code != '200') {
+                            echo "API non prête, code HTTP : ${code}. Nouvelle tentative dans 2 secondes..."
+                            sleep 2
+                            error("API non prête")
+                        }
+                        echo "API prête avec code HTTP 200."
+                    }
+                }
             }
         }
 
