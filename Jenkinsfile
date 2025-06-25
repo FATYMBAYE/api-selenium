@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "tp3-api"
-        CONTAINER_NAME = "tp3-api-container"
+        IMAGE_NAME = 'tp3-api'
+        CONTAINER_NAME = 'tp3-api-container'
     }
 
     stages {
@@ -13,59 +13,49 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Docker image') {
             steps {
-                script {
-                    sh "docker build --no-cache -t ${IMAGE_NAME} ."
-                }
+                echo ' Build de l’image Docker...'
+                sh 'docker build -t ${IMAGE_NAME}:latest .'
             }
         }
 
-        stage('Run API Container') {
+        stage('Run API container') {
             steps {
-                script {
-                    sh "docker rm -f ${CONTAINER_NAME} || true"
-                    sh "docker run -d --name ${CONTAINER_NAME} -p 8000:8000 ${IMAGE_NAME}"
-
-                    echo "Attente que l'API soit disponible sur http://localhost:8000..."
-                    timeout(time: 30, unit: 'SECONDS') {
-                        waitUntil {
-                            script {
-                                def response = sh(
-                                    script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/ || echo '000'",
-                                    returnStdout: true
-                                ).trim()
-                                echo "HTTP Status: ${response}"
-                                return (response == '200')
-                            }
-                        }
-                    }
-                }
+                echo ' Lancement du container API...'
+                sh 'docker rm -f ${CONTAINER_NAME} || true'
+                sh 'docker run -d --name ${CONTAINER_NAME} -p 8000:8000 ${IMAGE_NAME}:latest'
+                sh 'sleep 5'
             }
         }
 
-        stage('Run Selenium Tests') {
+        stage('Run unit tests') {
             steps {
-                script {
-                    // Lancer un container pour exécuter les tests avec accès au réseau hôte
-                    sh """
-                    docker run --rm --network host \
-                        -v \$(pwd):/app -w /app \
-                        ${IMAGE_NAME} python3 tests/selenium_test.py
-                    """
-                }
+                echo ' Exécution des tests unitaires...'
+                sh 'docker exec ${CONTAINER_NAME} pytest tests/'
             }
         }
 
-        stage('PMD Analysis') {
+        stage('Run Selenium tests') {
             steps {
-                script {
-                    // Assure-toi d'avoir un ruleset PMD compatible si tu utilises Python !
-                    sh """
-                    docker run --rm -v \$(pwd):/src ctsd/pmd \
-                    pmd-bin-6.52.0/bin/run.sh pmd \
-                    -d /src/app -R rulesets/java/quickstart.xml -f text
-                    """
+                echo ' Exécution des tests Selenium...'
+                sh 'docker exec ${CONTAINER_NAME} python selenium_test.py'
+            }
+        }
+
+        stage('SonarQube analysis') {
+            environment {
+                SONAR_TOKEN = credentials('sonar-token')  // Crée ce secret dans Jenkins
+            }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        sonar-scanner \
+                        -Dsonar.projectKey=tp3-api \
+                        -Dsonar.sources=app \
+                        -Dsonar.host.url=$SONAR_HOST_URL \
+                        -Dsonar.login=$SONAR_TOKEN
+                    '''
                 }
             }
         }
@@ -73,12 +63,14 @@ pipeline {
 
     post {
         always {
-            script {
-                // Voir les logs pour debug si besoin
-                sh "docker logs ${CONTAINER_NAME} || true"
-                // Nettoyage
-                sh "docker rm -f ${CONTAINER_NAME} || true"
-            }
+            echo ' Nettoyage...'
+            sh 'docker rm -f ${CONTAINER_NAME} || true'
+        }
+        success {
+            echo 'Pipeline terminé avec succès !'
+        }
+        failure {
+            echo ' Pipeline échoué.'
         }
     }
 }
