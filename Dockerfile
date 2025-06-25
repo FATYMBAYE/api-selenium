@@ -22,7 +22,6 @@ RUN wget -q -O /tmp/chromedriver.zip \
     chmod +x /usr/local/bin/chromedriver && \
     rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64
 
-
 # Variables environnement pour Chrome headless
 ENV CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_BIN=/usr/local/bin/chromedriver
@@ -35,6 +34,9 @@ COPY requirements.txt .
 
 # Installer les dépendances Python
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Important : dire à Python où trouver le module `app`
+ENV PYTHONPATH=/
 
 EXPOSE 8000
 
