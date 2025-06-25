@@ -14,6 +14,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+# Health check endpoint
+
 # Routes API
 @app.get("/add")
 def add(a: int, b: int):
