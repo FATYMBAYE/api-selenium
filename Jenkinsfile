@@ -60,22 +60,26 @@ pipeline {
             }
         }
 
-        stage('SonarQube analysis') {
-            environment {
-                SONAR_TOKEN = credentials('sonarqube-token')
-            }
-            steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        sonar-scanner \
-                        -Dsonar.projectKey=tp3-api \
-                        -Dsonar.sources=app \
-                        -Dsonar.host.url=$SONAR_HOST_URL \
-                        -Dsonar.login=$SONAR_TOKEN
-                    '''
-                }
-            }
+       stage('SonarQube Analysis') {
+    environment {
+        SONAR_TOKEN = credentials('sonarqube-token')  // Ton token Jenkins credentials
+    }
+    steps {
+        echo 'Analyse SonarQube en cours...'
+        withSonarQubeEnv('SonarQube') {
+            sh '''
+                docker run --rm \
+                    -e SONAR_HOST_URL=$SONAR_HOST_URL \
+                    -e SONAR_LOGIN=$SONAR_TOKEN \
+                    -v $WORKSPACE:/usr/src \
+                    sonarsource/sonar-scanner-cli \
+                    -Dsonar.projectKey=tp3-api \
+                    -Dsonar.sources=app
+            '''
         }
+    }
+}
+
     }
 
     post {
