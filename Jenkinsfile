@@ -55,7 +55,8 @@ pipeline {
         stage('Run Selenium tests') {
             steps {
                 echo 'Exécution des tests Selenium...'
-                sh "docker exec ${CONTAINER_NAME} python selenium_test.py"
+                sh "docker exec ${CONTAINER_NAME} python tests/selenium_test.py"
+
             }
         }
 
