@@ -4,7 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = 'tp3-api'
         CONTAINER_NAME = 'tp3-api-container'
-        API_URL = 'http://host.docker.internal:8000/00/'  // adapte ce path à ta route valide
+        API_URL = 'http://host.docker.internal:8000/health'  // <-- adapte cette URL selon ta vraie route de santé
     }
 
     stages {
@@ -27,10 +27,13 @@ pipeline {
                 sh 'docker rm -f ${CONTAINER_NAME} || true'
                 sh 'docker run -d --name ${CONTAINER_NAME} -p 8000:8000 ${IMAGE_NAME}:latest'
 
-                echo 'Vérification que l’API est prête depuis le container Jenkins...'
+                echo 'Vérification que l’API est prête depuis Jenkins container...'
                 script {
                     retry(10) {
-                        def code = sh(script: "curl -L -s -o /dev/null -w \"%{http_code}\" ${API_URL}", returnStdout: true).trim()
+                        def code = sh(
+                            script: "curl -L -s -o /dev/null -w \"%{http_code}\" ${API_URL}",
+                            returnStdout: true
+                        ).trim()
                         if (code != '200') {
                             echo "API non prête, code HTTP : ${code}. Nouvelle tentative dans 2 secondes..."
                             sleep 2
@@ -45,14 +48,14 @@ pipeline {
         stage('Run unit tests') {
             steps {
                 echo 'Exécution des tests unitaires...'
-                sh 'docker exec ${CONTAINER_NAME} pytest tests/'
+                sh "docker exec ${CONTAINER_NAME} pytest tests/"
             }
         }
 
         stage('Run Selenium tests') {
             steps {
                 echo 'Exécution des tests Selenium...'
-                sh 'docker exec ${CONTAINER_NAME} python selenium_test.py'
+                sh "docker exec ${CONTAINER_NAME} python selenium_test.py"
             }
         }
 
