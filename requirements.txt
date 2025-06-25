@@ -4,3 +4,6 @@ pytest
 pylint
 selenium
 requests
+httpx
+selenium-wire
+selenium-stealth
