@@ -16,6 +16,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
+                    // Construire l'image Docker à partir du Dockerfile à la racine
                     sh "docker build -t ${IMAGE_NAME} ."
                 }
             }
@@ -24,14 +25,15 @@ pipeline {
         stage('Run API Container') {
             steps {
                 script {
-                    // Stoppe un conteneur éventuel du même nom
+                    // Stopper un conteneur du même nom s'il existe
                     sh "docker rm -f ${CONTAINER_NAME} || true"
-                    // Lance le container en arrière-plan
+                    // Lancer le container en arrière-plan, expose le port 8000
                     sh "docker run -d --name ${CONTAINER_NAME} -p 8000:8000 ${IMAGE_NAME}"
-                    // Attendre que l’API soit disponible (timeout 30s)
-                    timeout(time:30, unit:'SECONDS') {
+                    // Attendre que l'API réponde sur localhost:8000 (timeout 30s)
+                    timeout(time: 30, unit: 'SECONDS') {
                         waitUntil {
                             script {
+                                // On utilise localhost car Jenkins et Docker sur la même machine
                                 def response = sh(script: "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/", returnStdout: true).trim()
                                 return (response == '200')
                             }
@@ -44,7 +46,13 @@ pipeline {
         stage('Run Selenium Tests') {
             steps {
                 script {
-                    sh "docker exec ${CONTAINER_NAME} python3 tests/selenium_test.py"
+                    // Exécuter le test Selenium **depuis Jenkins**, pas depuis le container de l'API
+                    // car Selenium doit être lancé dans un container séparé (avec Chrome/ChromeDriver)
+                    // Ici il faut plutôt lancer un container dédié aux tests Selenium
+                    sh """
+                    docker run --rm --network host -v \$(pwd):/app -w /app ${IMAGE_NAME} \
+                    python3 tests/selenium_test.py
+                    """
                 }
             }
         }
@@ -52,10 +60,9 @@ pipeline {
         stage('PMD Analysis') {
             steps {
                 script {
-                    // Ici tu lances PMD sur ton code Java (adapter selon ton projet)
-                    // Exemple d’appel via un container docker PMD (avec le volume)
+                    // Lancer PMD via docker (adapter selon langage)
                     sh """
-                        docker run --rm -v \$(pwd):/src ctsd/pmd pmd-bin-6.52.0/bin/run.sh pmd -d /src/app -R rulesets/java/quickstart.xml -f text
+                    docker run --rm -v \$(pwd):/src ctsd/pmd pmd-bin-6.52.0/bin/run.sh pmd -d /src/app -R rulesets/java/quickstart.xml -f text
                     """
                 }
             }
@@ -65,7 +72,7 @@ pipeline {
     post {
         always {
             script {
-                // Nettoyage : arrêter et supprimer le container
+                // Nettoyage : arrêter et supprimer le container si il tourne encore
                 sh "docker rm -f ${CONTAINER_NAME} || true"
             }
         }
