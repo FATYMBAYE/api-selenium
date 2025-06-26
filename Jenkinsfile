@@ -74,7 +74,7 @@ pipeline {
                 sh '''
                     docker run --rm \
                         --network jenkins-net \
-                        -e SONAR_HOST_URL=http://sonarqube:9000 \
+                        -e SONAR_HOST_URL=http://localhost:9000 \
                         -e SONAR_LOGIN=$SONAR_TOKEN \
                         -v $WORKSPACE:/usr/src \
                         sonarsource/sonar-scanner-cli \
