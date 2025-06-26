@@ -4,7 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = 'tp3-api'
         CONTAINER_NAME = 'tp3-api-container'
-        API_URL = 'http://host.docker.internal:8000/health'  // <-- adapte cette URL selon ta vraie route de santé
+        API_URL = 'http://host.docker.internal:8000/health'
     }
 
     stages {
@@ -25,7 +25,13 @@ pipeline {
             steps {
                 echo 'Lancement du container API...'
                 sh 'docker rm -f ${CONTAINER_NAME} || true'
-                sh 'docker run -d --name ${CONTAINER_NAME} -p 8000:8000 ${IMAGE_NAME}:latest'
+                sh '''
+                    docker run -d \
+                        --name ${CONTAINER_NAME} \
+                        --network jenkins-net \
+                        -p 8000:8000 \
+                        ${IMAGE_NAME}:latest
+                '''
 
                 echo 'Vérification que l’API est prête depuis Jenkins container...'
                 script {
@@ -56,30 +62,27 @@ pipeline {
             steps {
                 echo 'Exécution des tests Selenium...'
                 sh "docker exec ${CONTAINER_NAME} python tests/selenium_test.py"
-
             }
         }
 
-       stage('SonarQube Analysis') {
-    environment {
-        SONAR_TOKEN = credentials('sonarqube-token')  // Ton token Jenkins credentials
-    }
-    steps {
-        echo 'Analyse SonarQube en cours...'
-        withSonarQubeEnv('SonarQube') {
-            sh '''
-                docker run --rm \
-                    -e SONAR_HOST_URL=$SONAR_HOST_URL \
-                    -e SONAR_LOGIN=$SONAR_TOKEN \
-                    -v $WORKSPACE:/usr/src \
-                    sonarsource/sonar-scanner-cli \
-                    -Dsonar.projectKey=tp3-api \
-                    -Dsonar.sources=app
-            '''
+        stage('SonarQube Analysis') {
+            environment {
+                SONAR_TOKEN = credentials('sonarqube-token1')
+            }
+            steps {
+                echo 'Analyse SonarQube en cours...'
+                sh '''
+                    docker run --rm \
+                        --network jenkins-net \
+                        -e SONAR_HOST_URL=http://sonarqube:9000 \
+                        -e SONAR_LOGIN=$SONAR_TOKEN \
+                        -v $WORKSPACE:/usr/src \
+                        sonarsource/sonar-scanner-cli \
+                        -Dsonar.projectKey=tp3-api \
+                        -Dsonar.sources=app
+                '''
+            }
         }
-    }
-}
-
     }
 
     post {
